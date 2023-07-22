@@ -1,0 +1,46 @@
+require("dotenv").config();
+require("express-async-errors");
+const helmet = require("helmet"); //security package
+const cors = require("cors");
+const xss = require("xss-clean");
+const rateLimitr = require("express-rate-limit");
+const connectDB = require("./db/connect");
+
+const express = require("express");
+const app = express();
+
+const authenticateUser = require("./middleware/authentication");
+const authRoutes = require("./routes/auth");
+const jobRoutes = require("./routes/jobs");
+
+// error handler
+const notFoundMiddleware = require("./middleware/not-found");
+const errorHandlerMiddleware = require("./middleware/error-handler");
+
+app.set("trust proxy", 1); //for deploying to hereku,aws
+app.use(rateLimitr({ windowMs: 15 * 60 * 1000, max: 100 }));
+app.use(express.json());
+app.use(helmet());
+app.use(cors());
+app.use(xss());
+
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/jobs", authenticateUser, jobRoutes);
+
+app.use(notFoundMiddleware);
+app.use(errorHandlerMiddleware);
+
+const port = process.env.PORT || 3000;
+
+const start = async () => {
+  try {
+    await connectDB(process.env.MONGO_URI);
+    app.listen(port, () =>
+      console.log(`Server is listening on port ${port}...`)
+    );
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+start();
